@@ -1,0 +1,36 @@
+# Electrum Server Configuration
+#
+# This file defines default Electrum servers for different Bitcoin networks.
+# You can modify these settings to use your own Electrum servers.
+#
+# Each network section should have:
+# - host: The Electrum server hostname or IP address
+# - port: The port number
+# - protocol: Either "tcp" or "ssl"
+
+[bitcoin]
+host = "35.187.18.233"
+port = 8900
+protocol = "ssl"
+
+[testnet]
+host = "electrum.blockstream.info"
+port = 60002
+protocol = "ssl"
+
+[signet]
+host = "electrum.blockstream.info"
+port = 60602
+protocol = "ssl"
+
+[regtest]
+host = "34.65.252.32"
+port = 18483
+protocol = "tcp"
+
+# You can also define alternative configurations by adding custom sections
+# Example:
+# [my-regtest]
+# host = "localhost"
+# port = 50001
+# protocol = "tcp"
