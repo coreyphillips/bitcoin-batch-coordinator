@@ -1,5 +1,5 @@
 # Stage 1: Build Rust binaries
-FROM rust:1.91-slim as rust-builder
+FROM rust:1.91-slim AS rust-builder
 
 WORKDIR /build
 
@@ -21,7 +21,7 @@ COPY electrum-servers.toml ./
 RUN cargo build --release --bin api-gateway --bin coordinator
 
 # Stage 2: Build Web UI
-FROM node:20-alpine as ui-builder
+FROM node:20-alpine AS ui-builder
 
 WORKDIR /app
 

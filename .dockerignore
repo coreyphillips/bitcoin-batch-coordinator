@@ -31,7 +31,6 @@ examples/
 # Docker
 Dockerfile
 .dockerignore
-docker/
 
 # Umbrel
 umbrel/
