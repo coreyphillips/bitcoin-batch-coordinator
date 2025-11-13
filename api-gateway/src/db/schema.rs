@@ -1,6 +1,16 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CoordinatorIdentity {
+    pub id: i64,
+    pub identity_type: String, // "file", "phrase", or "generated"
+    pub encrypted_data: Vec<u8>,
+    pub pubkey: String,
+    pub created_at: i64,
+    pub is_active: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Batch {
     pub id: String,
     pub intent_data: String,

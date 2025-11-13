@@ -111,6 +111,22 @@ async fn run_migrations(pool: &SqlitePool) -> Result<()> {
     .execute(pool)
     .await?;
 
+    // Create identity table
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS coordinator_identity (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            identity_type TEXT NOT NULL,
+            encrypted_data BLOB NOT NULL,
+            pubkey TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            is_active BOOLEAN DEFAULT TRUE
+        )
+        "#,
+    )
+    .execute(pool)
+    .await?;
+
     // Create indices for better query performance
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_batches_state ON batches(state)")
         .execute(pool)
