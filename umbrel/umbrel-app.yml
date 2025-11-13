@@ -1,0 +1,75 @@
+manifestVersion: 1
+id: bitcoin-batch-coordinator
+category: bitcoin
+name: Bitcoin Batch Coordinator
+version: "0.1.0"
+tagline: Save on Bitcoin fees through transaction batching
+description: >-
+  The Bitcoin Batch Coordinator is a peer-to-peer system that combines individual
+  Bitcoin transactions into coordinated batches to save on transaction fees and
+  improve on-chain efficiency.
+
+
+  Features:
+
+  - Peer-to-peer transaction batching via Pubky network
+
+  - Three-phase commit-reveal-sign protocol for security
+
+  - Automatic fee distribution based on transaction weight
+
+  - Built-in ban management for malicious participants
+
+  - Beautiful dashboard for monitoring batches
+
+  - Real-time updates via WebSocket
+
+  - Integration with your Umbrel Bitcoin node
+
+
+  How it works:
+
+  1. Participants commit to their inputs/outputs
+
+  2. Coordinator collects reveals and builds a deterministic transaction
+
+  3. Participants sign using PSBT (keys never leave your device)
+
+  4. Coordinator broadcasts the final batched transaction
+
+
+  Save on Bitcoin fees while maintaining full custody of your keys!
+
+developer: Corey Phillips
+website: https://github.com/coreyphillips/bitcoin-batch-coordinator
+dependencies:
+  - bitcoin
+repo: https://github.com/coreyphillips/bitcoin-batch-coordinator
+support: https://github.com/coreyphillips/bitcoin-batch-coordinator/issues
+port: 3001
+gallery:
+  - 1.jpg
+  - 2.jpg
+  - 3.jpg
+path: ""
+defaultPassword: ""
+releaseNotes: >-
+  Initial release of Bitcoin Batch Coordinator for Umbrel.
+
+
+  Features:
+
+  - Coordinator service for managing batches
+
+  - Beautiful web dashboard
+
+  - Real-time batch monitoring
+
+  - Fee savings tracking
+
+  - Integration with Umbrel Bitcoin/Electrum
+
+
+  This is an alpha release. Please report any issues on GitHub.
+submitter: Claude
+submission: https://github.com/coreyphillips/bitcoin-batch-coordinator

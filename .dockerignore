@@ -1,0 +1,37 @@
+# Git
+.git
+.gitignore
+
+# Rust
+target/
+**/*.rs.bk
+*.pdb
+
+# Node
+web-ui/node_modules
+web-ui/dist
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docs
+*.md
+!README.md
+
+# Examples
+examples/
+
+# Docker
+Dockerfile
+.dockerignore
+docker/
+
+# Umbrel
+umbrel/

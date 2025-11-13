@@ -1,0 +1,44 @@
+version: "3.8"
+
+services:
+  app:
+    image: ghcr.io/coreyphillips/bitcoin-batch-coordinator:latest
+    restart: unless-stopped
+    environment:
+      # API Configuration
+      - API_HOST=0.0.0.0
+      - API_PORT=3000
+      - DATABASE_URL=sqlite:///data/coordinator.db
+      - WEB_DIR=/app/web
+
+      # Network Configuration
+      - NETWORK=${NETWORK:-bitcoin}
+
+      # Batch Parameters
+      - MIN_PARTICIPANTS=${MIN_PARTICIPANTS:-2}
+      - MAX_PARTICIPANTS=${MAX_PARTICIPANTS:-10}
+      - TIMEOUT_SECONDS=${TIMEOUT_SECONDS:-300}
+
+      # Electrum Integration (from Umbrel)
+      - ELECTRUM_HOST=${APP_BITCOIN_ELECTRUM_HOST:-electrum}
+      - ELECTRUM_PORT=${APP_BITCOIN_ELECTRUM_PORT:-50001}
+
+      # Bitcoin RPC (optional, for future integration)
+      - BITCOIN_RPC_HOST=${APP_BITCOIN_NODE_IP:-bitcoin}
+      - BITCOIN_RPC_PORT=${APP_BITCOIN_RPC_PORT:-8332}
+      - BITCOIN_RPC_USER=${APP_BITCOIN_RPC_USER}
+      - BITCOIN_RPC_PASS=${APP_BITCOIN_RPC_PASS}
+
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
+      - ${APP_DATA_DIR}/config:/config
+
+    ports:
+      - "${APP_BITCOIN_BATCH_COORDINATOR_PORT:-3001}:3000"
+
+    networks:
+      - umbrel_main_network
+
+networks:
+  umbrel_main_network:
+    external: true

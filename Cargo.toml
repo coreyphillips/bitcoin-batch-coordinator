@@ -3,6 +3,7 @@ members = [
     "coordinator",
     "participant",
     "common",
+    "api-gateway",
 ]
 resolver = "2"
 
