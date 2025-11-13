@@ -1,6 +1,8 @@
 use sqlx::SqlitePool;
-use tokio::sync::broadcast;
+use std::sync::Arc;
+use tokio::sync::{broadcast, RwLock};
 use crate::events::CoordinatorEvent;
+use crate::coordinator_manager::CoordinatorManager;
 
 /// Application state shared across all API handlers
 #[derive(Clone)]
@@ -10,6 +12,9 @@ pub struct AppState {
 
     /// Event bus for coordinator events (broadcast channel)
     pub event_bus: broadcast::Sender<CoordinatorEvent>,
+
+    /// Coordinator manager for controlling the batch coordinator
+    pub coordinator: Arc<RwLock<CoordinatorManager>>,
 }
 
 impl AppState {

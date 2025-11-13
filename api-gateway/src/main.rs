@@ -15,6 +15,7 @@ use tower_http::{
 };
 use tracing::{info, warn};
 
+mod coordinator_manager;
 mod crypto;
 mod db;
 mod routes;
@@ -77,10 +78,14 @@ async fn main() -> Result<()> {
     // Create event bus for coordinator events
     let (event_tx, _) = broadcast::channel::<CoordinatorEvent>(1000);
 
+    // Create coordinator manager
+    let coordinator_manager = coordinator_manager::CoordinatorManager::new(db_pool.clone());
+
     // Create application state
     let app_state = AppState {
         db: db_pool,
         event_bus: event_tx,
+        coordinator: std::sync::Arc::new(tokio::sync::RwLock::new(coordinator_manager)),
     };
 
     // Build API routes
@@ -100,6 +105,7 @@ async fn main() -> Result<()> {
         .route("/identity/import-file", post(routes::identity::import_from_file))
         .route("/identity/import-phrase", post(routes::identity::import_from_phrase))
         .route("/identity", axum::routing::delete(routes::identity::delete_identity))
+        .route("/coordinator/status", get(routes::coordinator::get_coordinator_status))
         .with_state(app_state);
 
     // Build main app with middleware
