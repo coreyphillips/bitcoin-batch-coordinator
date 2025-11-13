@@ -115,6 +115,11 @@ impl CoordinatorManager {
             .and_then(|p| p.parent().map(|p| p.join("coordinator")))
             .ok_or("Failed to find coordinator binary")?;
 
+        // Create log file for coordinator output
+        let log_path = "/tmp/coordinator.log";
+        let log_file = std::fs::File::create(log_path)
+            .map_err(|e| format!("Failed to create log file: {}", e))?;
+
         // Spawn coordinator process
         let child = Command::new(coordinator_bin)
             .arg(&temp_path)
@@ -131,19 +136,19 @@ impl CoordinatorManager {
             .arg("--deadline-ms")
             .arg(config.deadline_ms.to_string())
             .arg("--multi-batch")
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            .stdout(log_file.try_clone().map_err(|e| format!("Failed to clone log file: {}", e))?)
+            .stderr(log_file)
             .spawn()
             .map_err(|e| format!("Failed to spawn coordinator: {}", e))?;
 
         let pid = child.id();
-        info!("Coordinator started with PID: {}", pid);
+        info!("Coordinator started with PID: {} (logs: {})", pid, log_path);
 
         // Store process
         let mut process = self.process.write().await;
         *process = Some(child);
 
-        Ok(format!("Coordinator started (PID: {})", pid))
+        Ok(format!("Coordinator started (PID: {}). Check logs at {} for batch IDs.", pid, log_path))
     }
 
     /// Stop the coordinator

@@ -57,112 +57,27 @@ pub struct CreateBatchResponse {
     pub message: String,
 }
 
-/// Create a new batch
+/// Create a new batch (starts the coordinator)
 pub async fn create_batch(
     State(state): State<AppState>,
-    Json(payload): Json<CreateBatchRequest>,
+    Json(_payload): Json<CreateBatchRequest>,
 ) -> Result<Json<CreateBatchResponse>, StatusCode> {
     // Start the coordinator (will use stored identity and config)
+    // The coordinator automatically creates batches when it starts
     let coordinator = state.coordinator.read().await;
 
     match coordinator.start_coordinator().await {
         Ok(message) => {
-            // Create a batch record in the database
-            let batch_id = uuid::Uuid::new_v4().to_string();
-            let now = chrono::Utc::now().timestamp();
-
-            // Fetch coordinator config for intent data
-            #[derive(sqlx::FromRow)]
-            struct ConfigRow {
-                network: String,
-                fee_rate: i64,
-            }
-
-            let config: ConfigRow = sqlx::query_as(
-                "SELECT network, fee_rate FROM coordinator_config WHERE id = 1"
-            )
-            .fetch_one(&state.db)
-            .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-            // Create intent data JSON
-            let intent_data = serde_json::json!({
-                "network": config.network,
-                "fee_rate": config.fee_rate,
-                "min_participants": payload.min_participants,
-                "max_participants": payload.max_participants,
-                "deadline_ms": payload.timeout_seconds * 1000,
-            }).to_string();
-
-            // Insert batch record
-            sqlx::query(
-                r#"
-                INSERT INTO batches (id, intent_data, created_at, state, participant_count)
-                VALUES (?, ?, ?, ?, ?)
-                "#
-            )
-            .bind(&batch_id)
-            .bind(&intent_data)
-            .bind(now)
-            .bind("filling")
-            .bind(0)
-            .execute(&state.db)
-            .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
             Ok(Json(CreateBatchResponse {
-                id: batch_id,
-                message,
+                id: "coordinator-started".to_string(),
+                message: format!("{} Coordinator will create batches automatically.", message),
             }))
         }
         Err(e) => {
-            // If already running, that's ok - just create a new batch record
             if e.contains("already running") {
-                let batch_id = uuid::Uuid::new_v4().to_string();
-                let now = chrono::Utc::now().timestamp();
-
-                // Fetch coordinator config for intent data
-                #[derive(sqlx::FromRow)]
-                struct ConfigRow {
-                    network: String,
-                    fee_rate: i64,
-                }
-
-                let config: ConfigRow = sqlx::query_as(
-                    "SELECT network, fee_rate FROM coordinator_config WHERE id = 1"
-                )
-                .fetch_one(&state.db)
-                .await
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-                // Create intent data JSON
-                let intent_data = serde_json::json!({
-                    "network": config.network,
-                    "fee_rate": config.fee_rate,
-                    "min_participants": payload.min_participants,
-                    "max_participants": payload.max_participants,
-                    "deadline_ms": payload.timeout_seconds * 1000,
-                }).to_string();
-
-                // Insert batch record
-                sqlx::query(
-                    r#"
-                    INSERT INTO batches (id, intent_data, created_at, state, participant_count)
-                    VALUES (?, ?, ?, ?, ?)
-                    "#
-                )
-                .bind(&batch_id)
-                .bind(&intent_data)
-                .bind(now)
-                .bind("filling")
-                .bind(0)
-                .execute(&state.db)
-                .await
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
                 Ok(Json(CreateBatchResponse {
-                    id: batch_id,
-                    message: "Coordinator is already running and accepting participants".to_string(),
+                    id: "coordinator-running".to_string(),
+                    message: "Coordinator is already running and managing batches".to_string(),
                 }))
             } else {
                 tracing::error!("Failed to start coordinator: {}", e);
