@@ -15,6 +15,7 @@ use tower_http::{
 };
 use tracing::{info, warn};
 
+mod crypto;
 mod db;
 mod routes;
 mod state;
@@ -98,7 +99,6 @@ async fn main() -> Result<()> {
         .route("/identity/current", get(routes::identity::get_current_identity))
         .route("/identity/import-file", post(routes::identity::import_from_file))
         .route("/identity/import-phrase", post(routes::identity::import_from_phrase))
-        .route("/identity/generate", post(routes::identity::generate_identity))
         .route("/identity", axum::routing::delete(routes::identity::delete_identity))
         .with_state(app_state);
 

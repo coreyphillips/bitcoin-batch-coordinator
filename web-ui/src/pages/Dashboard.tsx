@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { fetchBatches, fetchStats, type Batch } from '../lib/api';
+import { fetchBatches, fetchStats, type Batch, api } from '../lib/api';
 import { BatchCard } from '../components/BatchCard';
 import { BatchDetailsModal } from '../components/BatchDetailsModal';
 import { CreateBatchModal } from '../components/CreateBatchModal';
@@ -16,6 +16,15 @@ export function Dashboard() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showIdentityModal, setShowIdentityModal] = useState(false);
 
+  // Check for coordinator identity
+  const { data: identity, isLoading: identityLoading } = useQuery({
+    queryKey: ['identity'],
+    queryFn: async () => {
+      const response = await api.get('/identity/current');
+      return response.data;
+    },
+  });
+
   const { data: batchesData, isLoading: batchesLoading } = useQuery({
     queryKey: ['batches'],
     queryFn: () => fetchBatches(),
@@ -31,6 +40,32 @@ export function Dashboard() {
   const activeBatches = batchesData?.batches.filter(
     (b) => b.state === 'filling' || b.state === 'ready' || b.state === 'signing'
   ) || [];
+
+  // Show identity setup if no identity is configured
+  if (!identityLoading && !identity) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-bitcoin-dark via-gray-900 to-black">
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            duration: 4000,
+            style: {
+              background: '#1F2937',
+              color: '#fff',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+            },
+            success: {
+              iconTheme: {
+                primary: '#F7931A',
+                secondary: '#fff',
+              },
+            },
+          }}
+        />
+        <IdentityModal onClose={() => {}} required={true} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-bitcoin-dark via-gray-900 to-black">

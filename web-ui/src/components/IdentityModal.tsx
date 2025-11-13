@@ -1,4 +1,4 @@
-import { X, Key, Upload, FileText, Sparkles, Copy, QrCode as QrCodeIcon } from 'lucide-react';
+import { X, Key, Upload, FileText, Copy, QrCode as QrCodeIcon } from 'lucide-react';
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useDropzone } from 'react-dropzone';
@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 
 interface IdentityModalProps {
   onClose: () => void;
+  required?: boolean;
 }
 
 interface CurrentIdentity {
@@ -17,15 +18,12 @@ interface CurrentIdentity {
   created_at: number;
 }
 
-export function IdentityModal({ onClose }: IdentityModalProps) {
+export function IdentityModal({ onClose, required = false }: IdentityModalProps) {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'current' | 'import-file' | 'import-phrase' | 'generate'>('current');
-  const [passphrase, setPassphrase] = useState('');
-  const [confirmPassphrase, setConfirmPassphrase] = useState('');
   const [recoveryPhrase, setRecoveryPhrase] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [generatedPhrase, setGeneratedPhrase] = useState<string | null>(null);
   const [showQR, setShowQR] = useState(false);
+  const [passphrase, setPassphrase] = useState('');
 
   // Fetch current identity
   const { data: currentIdentity } = useQuery<CurrentIdentity | null>({
@@ -35,6 +33,10 @@ export function IdentityModal({ onClose }: IdentityModalProps) {
       return response.data;
     },
   });
+
+  const [activeTab, setActiveTab] = useState<'current' | 'import-file' | 'import-phrase'>(
+    currentIdentity ? 'current' : 'import-file'
+  );
 
   // Import from file mutation
   const importFileMutation = useMutation({
@@ -50,9 +52,14 @@ export function IdentityModal({ onClose }: IdentityModalProps) {
     onSuccess: (data) => {
       toast.success(`Identity imported! Pubkey: ${data.pubkey.slice(0, 16)}...`);
       queryClient.invalidateQueries({ queryKey: ['identity'] });
-      setActiveTab('current');
+      if (currentIdentity) {
+        setActiveTab('current');
+      }
       setSelectedFile(null);
       setPassphrase('');
+      if (required) {
+        window.location.reload();
+      }
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.message || 'Failed to import identity');
@@ -71,28 +78,17 @@ export function IdentityModal({ onClose }: IdentityModalProps) {
     onSuccess: (data) => {
       toast.success(`Identity imported! Pubkey: ${data.pubkey.slice(0, 16)}...`);
       queryClient.invalidateQueries({ queryKey: ['identity'] });
-      setActiveTab('current');
+      if (currentIdentity) {
+        setActiveTab('current');
+      }
       setRecoveryPhrase('');
       setPassphrase('');
+      if (required) {
+        window.location.reload();
+      }
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.message || 'Failed to import from phrase');
-    },
-  });
-
-  // Generate new identity mutation
-  const generateMutation = useMutation({
-    mutationFn: async (pass: string) => {
-      const response = await api.post('/identity/generate', { passphrase: pass });
-      return response.data;
-    },
-    onSuccess: (data) => {
-      setGeneratedPhrase(data.recovery_phrase);
-      toast.success('New identity generated! Save your recovery phrase!');
-      queryClient.invalidateQueries({ queryKey: ['identity'] });
-    },
-    onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Failed to generate identity');
     },
   });
 
@@ -134,24 +130,13 @@ export function IdentityModal({ onClose }: IdentityModalProps) {
     importPhraseMutation.mutate({ phrase: recoveryPhrase, pass: passphrase });
   };
 
-  const handleGenerate = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!passphrase || passphrase !== confirmPassphrase) {
-      toast.error('Passphrases do not match');
-      return;
-    }
-    if (passphrase.length < 8) {
-      toast.error('Passphrase must be at least 8 characters');
-      return;
-    }
-    generateMutation.mutate(passphrase);
-  };
-
-  const tabs = [
+  const tabs = currentIdentity ? [
     { id: 'current' as const, label: 'Current Identity', icon: Key },
     { id: 'import-file' as const, label: 'Import File', icon: Upload },
     { id: 'import-phrase' as const, label: 'Import Phrase', icon: FileText },
-    { id: 'generate' as const, label: 'Generate New', icon: Sparkles },
+  ] : [
+    { id: 'import-file' as const, label: 'Import File', icon: Upload },
+    { id: 'import-phrase' as const, label: 'Import Phrase', icon: FileText },
   ];
 
   return (
@@ -163,14 +148,23 @@ export function IdentityModal({ onClose }: IdentityModalProps) {
             <div className="w-10 h-10 rounded-lg bg-gradient-orange flex items-center justify-center">
               <Key className="w-6 h-6 text-white" />
             </div>
-            <h2 className="text-2xl font-bold text-white">Identity Management</h2>
+            <div>
+              <h2 className="text-2xl font-bold text-white">
+                {required ? 'Setup Coordinator Identity' : 'Identity Management'}
+              </h2>
+              {required && (
+                <p className="text-sm text-gray-400 mt-1">Import your identity to continue</p>
+              )}
+            </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-          >
-            <X className="w-6 h-6 text-gray-400" />
-          </button>
+          {!required && (
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+            >
+              <X className="w-6 h-6 text-gray-400" />
+            </button>
+          )}
         </div>
 
         {/* Tabs */}
@@ -199,90 +193,64 @@ export function IdentityModal({ onClose }: IdentityModalProps) {
         {/* Tab Content */}
         <div className="p-6">
           {/* Current Identity Tab */}
-          {activeTab === 'current' && (
+          {activeTab === 'current' && currentIdentity && (
             <div className="space-y-6">
-              {currentIdentity ? (
-                <>
-                  <div className="glass rounded-xl p-6 border border-white/10">
-                    <h3 className="text-lg font-semibold text-white mb-4">Active Coordinator Identity</h3>
+              <div className="glass rounded-xl p-6 border border-white/10">
+                <h3 className="text-lg font-semibold text-white mb-4">Active Coordinator Identity</h3>
 
-                    <div className="space-y-4">
-                      <div>
-                        <label className="text-sm text-gray-400">Public Key</label>
-                        <div className="flex items-center gap-2 mt-1">
-                          <code className="flex-1 px-3 py-2 bg-white/5 rounded-lg text-white font-mono text-sm break-all">
-                            {currentIdentity.pubkey}
-                          </code>
-                          <button
-                            onClick={() => {
-                              copyToClipboard(currentIdentity.pubkey);
-                              toast.success('Pubkey copied!');
-                            }}
-                            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                          >
-                            <Copy className="w-4 h-4 text-gray-400" />
-                          </button>
-                          <button
-                            onClick={() => setShowQR(!showQR)}
-                            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                          >
-                            <QrCodeIcon className="w-4 h-4 text-gray-400" />
-                          </button>
-                        </div>
-                      </div>
-
-                      {showQR && (
-                        <div className="flex justify-center p-4 bg-white rounded-lg">
-                          <QRCodeSVG value={currentIdentity.pubkey} size={200} />
-                        </div>
-                      )}
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm text-gray-400">Type</label>
-                          <div className="text-white font-semibold mt-1 capitalize">
-                            {currentIdentity.identity_type}
-                          </div>
-                        </div>
-                        <div>
-                          <label className="text-sm text-gray-400">Created</label>
-                          <div className="text-white font-semibold mt-1">
-                            {new Date(currentIdentity.created_at * 1000).toLocaleDateString()}
-                          </div>
-                        </div>
-                      </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm text-gray-400">Public Key</label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <code className="flex-1 px-3 py-2 bg-white/5 rounded-lg text-white font-mono text-sm break-all">
+                        {currentIdentity.pubkey}
+                      </code>
+                      <button
+                        onClick={() => {
+                          copyToClipboard(currentIdentity.pubkey);
+                          toast.success('Pubkey copied!');
+                        }}
+                        className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                      >
+                        <Copy className="w-4 h-4 text-gray-400" />
+                      </button>
+                      <button
+                        onClick={() => setShowQR(!showQR)}
+                        className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                      >
+                        <QrCodeIcon className="w-4 h-4 text-gray-400" />
+                      </button>
                     </div>
                   </div>
 
-                  <div className="glass rounded-xl p-4 border border-yellow-500/30 bg-yellow-500/10">
-                    <p className="text-sm text-yellow-400">
-                      ⚠️ This is your coordinator's public identity. Share this pubkey with participants who want to join your batches.
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <div className="text-center py-12">
-                  <Key className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-white mb-2">No Identity Configured</h3>
-                  <p className="text-gray-400 mb-6">
-                    Import an existing identity or generate a new one to get started
-                  </p>
-                  <div className="flex gap-3 justify-center">
-                    <button
-                      onClick={() => setActiveTab('import-file')}
-                      className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
-                    >
-                      Import File
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('generate')}
-                      className="px-4 py-2 gradient-orange text-white rounded-lg font-semibold hover:opacity-90"
-                    >
-                      Generate New
-                    </button>
+                  {showQR && (
+                    <div className="flex justify-center p-4 bg-white rounded-lg">
+                      <QRCodeSVG value={currentIdentity.pubkey} size={200} />
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm text-gray-400">Type</label>
+                      <div className="text-white font-semibold mt-1 capitalize">
+                        {currentIdentity.identity_type}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm text-gray-400">Created</label>
+                      <div className="text-white font-semibold mt-1">
+                        {new Date(currentIdentity.created_at * 1000).toLocaleDateString()}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              )}
+              </div>
+
+              <div className="glass rounded-xl p-4 border border-yellow-500/30 bg-yellow-500/10">
+                <p className="text-sm text-yellow-400">
+                  ⚠️ This is your coordinator's public identity. Share this pubkey with participants who want to join your batches.
+                </p>
+              </div>
             </div>
           )}
 
@@ -385,106 +353,6 @@ export function IdentityModal({ onClose }: IdentityModalProps) {
                 {importPhraseMutation.isPending ? 'Importing...' : 'Import from Phrase'}
               </button>
             </form>
-          )}
-
-          {/* Generate New Tab */}
-          {activeTab === 'generate' && (
-            <div className="space-y-6">
-              {!generatedPhrase ? (
-                <form onSubmit={handleGenerate} className="space-y-6">
-                  <div className="glass rounded-xl p-4 border border-blue-500/30 bg-blue-500/10">
-                    <p className="text-sm text-blue-400">
-                      ℹ️ This will generate a new coordinator identity with a recovery phrase. Save the phrase securely!
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-white mb-2">
-                      Passphrase
-                    </label>
-                    <input
-                      type="password"
-                      value={passphrase}
-                      onChange={(e) => setPassphrase(e.target.value)}
-                      className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-bitcoin-orange"
-                      placeholder="Enter a strong passphrase (min 8 characters)"
-                      required
-                      minLength={8}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-white mb-2">
-                      Confirm Passphrase
-                    </label>
-                    <input
-                      type="password"
-                      value={confirmPassphrase}
-                      onChange={(e) => setConfirmPassphrase(e.target.value)}
-                      className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-bitcoin-orange"
-                      placeholder="Confirm your passphrase"
-                      required
-                      minLength={8}
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={!passphrase || passphrase !== confirmPassphrase || generateMutation.isPending}
-                    className="w-full px-4 py-2 gradient-orange text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    <Sparkles className="w-5 h-5" />
-                    {generateMutation.isPending ? 'Generating...' : 'Generate New Identity'}
-                  </button>
-                </form>
-              ) : (
-                <div className="space-y-6">
-                  <div className="glass rounded-xl p-6 border border-green-500/30 bg-green-500/10">
-                    <h3 className="text-lg font-semibold text-green-400 mb-4 flex items-center gap-2">
-                      <Sparkles className="w-5 h-5" />
-                      Identity Generated Successfully!
-                    </h3>
-
-                    <div className="space-y-4">
-                      <div>
-                        <label className="text-sm text-green-400 font-semibold">Recovery Phrase</label>
-                        <div className="mt-2 p-4 bg-black/40 rounded-lg">
-                          <p className="text-white font-mono text-sm break-all">{generatedPhrase}</p>
-                        </div>
-                        <button
-                          onClick={() => {
-                            copyToClipboard(generatedPhrase);
-                            toast.success('Recovery phrase copied!');
-                          }}
-                          className="mt-2 px-3 py-1 bg-white/10 hover:bg-white/20 text-white rounded-lg text-sm flex items-center gap-2"
-                        >
-                          <Copy className="w-4 h-4" />
-                          Copy to Clipboard
-                        </button>
-                      </div>
-
-                      <div className="glass rounded-xl p-4 border border-red-500/30 bg-red-500/10">
-                        <p className="text-sm text-red-400 font-semibold">
-                          ⚠️ IMPORTANT: Save this recovery phrase in a secure location! You'll need it to restore your coordinator identity. This is the only time it will be shown.
-                        </p>
-                      </div>
-
-                      <button
-                        onClick={() => {
-                          setGeneratedPhrase(null);
-                          setPassphrase('');
-                          setConfirmPassphrase('');
-                          setActiveTab('current');
-                        }}
-                        className="w-full px-4 py-2 gradient-orange text-white rounded-lg font-semibold hover:opacity-90"
-                      >
-                        I've Saved My Recovery Phrase
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
           )}
         </div>
       </div>
