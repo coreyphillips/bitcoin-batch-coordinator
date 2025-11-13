@@ -59,15 +59,31 @@ pub struct CreateBatchResponse {
 
 /// Create a new batch
 pub async fn create_batch(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Json(_payload): Json<CreateBatchRequest>,
 ) -> Result<Json<CreateBatchResponse>, StatusCode> {
-    // TODO: Integrate with actual coordinator to create batch
-    // For now, return a placeholder response
-    Ok(Json(CreateBatchResponse {
-        id: uuid::Uuid::new_v4().to_string(),
-        message: "Batch creation not yet implemented - coordinator integration pending".to_string(),
-    }))
+    // Start the coordinator (will use stored identity and config)
+    let coordinator = state.coordinator.read().await;
+
+    match coordinator.start_coordinator().await {
+        Ok(message) => {
+            Ok(Json(CreateBatchResponse {
+                id: uuid::Uuid::new_v4().to_string(),
+                message,
+            }))
+        }
+        Err(e) => {
+            // If already running, that's ok
+            if e.contains("already running") {
+                Ok(Json(CreateBatchResponse {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    message: "Coordinator is already running and accepting participants".to_string(),
+                }))
+            } else {
+                Err(StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        }
+    }
 }
 
 #[derive(Serialize)]

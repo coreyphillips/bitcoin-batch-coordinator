@@ -68,36 +68,16 @@ echo ""
 echo -e "${GREEN}See TESTING.md for detailed instructions!${NC}"
 echo ""
 
-# Offer to start both services
-read -p "Start both API Gateway + Coordinator now? (y/n) " -n 1 -r
+# Offer to start API gateway
+read -p "Start API Gateway + Dashboard now? (y/n) " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo ""
-    echo -e "${GREEN}🎯 Starting Coordinator Daemon in background...${NC}"
-
-    # Start coordinator daemon in background
-    ./target/release/coordinator-daemon \
-        --database-url "sqlite:///$PROJECT_DIR/data/coordinator.db" \
-        --network regtest \
-        > "$PROJECT_DIR/data/coordinator.log" 2>&1 &
-
-    COORDINATOR_PID=$!
-    echo -e "${GREEN}✅ Coordinator started (PID: $COORDINATOR_PID)${NC}"
-    echo -e "${YELLOW}   Logs: $PROJECT_DIR/data/coordinator.log${NC}"
-    echo -e "${YELLOW}   Note: Coordinator will auto-read passphrase after you import identity${NC}"
-    echo ""
-
-    # Give it a moment to start
-    sleep 1
-
     echo -e "${GREEN}🌐 Starting API Gateway...${NC}"
     echo -e "${YELLOW}Dashboard will be available at: http://localhost:3000${NC}"
     echo ""
-    echo -e "${YELLOW}Press Ctrl+C to stop both services${NC}"
+    echo -e "${YELLOW}Note: Coordinator will start automatically when you create a batch${NC}"
     echo ""
-
-    # Trap to kill coordinator on exit
-    trap "echo ''; echo 'Stopping coordinator...'; kill $COORDINATOR_PID 2>/dev/null; exit" INT TERM EXIT
 
     # Start API gateway in foreground
     ./target/release/api-gateway \
