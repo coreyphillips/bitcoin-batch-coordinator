@@ -71,11 +71,10 @@ ENV API_HOST=0.0.0.0
 ENV API_PORT=3000
 ENV DATABASE_URL=sqlite:///data/coordinator.db
 ENV WEB_DIR=/app/web
-ENV NETWORK=signet
+ENV NETWORK=regtest
 ENV MIN_PARTICIPANTS=2
 ENV MAX_PARTICIPANTS=10
 ENV TIMEOUT_SECONDS=300
-# ENV COORDINATOR_PASSPHRASE=your-passphrase-here  # Set this to auto-start coordinator
 
 # Expose ports
 EXPOSE 3000

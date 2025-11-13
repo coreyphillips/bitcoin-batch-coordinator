@@ -100,6 +100,25 @@ pub async fn import_from_file(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
+    // Save encrypted passphrase to coordinator_config for auto-start
+    let encrypted_passphrase = crypto::encrypt_data(passphrase.as_bytes(), "coordinator-internal-key")
+        .map_err(|e| {
+            error!("Failed to encrypt passphrase: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    sqlx::query(
+        "UPDATE coordinator_config SET encrypted_passphrase = ?, updated_at = ? WHERE id = 1"
+    )
+    .bind(&encrypted_passphrase)
+    .bind(chrono::Utc::now().timestamp())
+    .execute(&state.db)
+    .await
+    .map_err(|e| {
+        error!("Failed to save passphrase: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
     info!("Identity imported from file: {}", pubkey);
 
     Ok(Json(IdentityResponse {
@@ -141,6 +160,25 @@ pub async fn import_from_phrase(
             error!("Failed to save identity: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
+
+    // Save encrypted passphrase to coordinator_config for auto-start
+    let encrypted_passphrase = crypto::encrypt_data(payload.passphrase.as_bytes(), "coordinator-internal-key")
+        .map_err(|e| {
+            error!("Failed to encrypt passphrase: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    sqlx::query(
+        "UPDATE coordinator_config SET encrypted_passphrase = ?, updated_at = ? WHERE id = 1"
+    )
+    .bind(&encrypted_passphrase)
+    .bind(chrono::Utc::now().timestamp())
+    .execute(&state.db)
+    .await
+    .map_err(|e| {
+        error!("Failed to save passphrase: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     info!("Identity imported from phrase: {}", pubkey);
 

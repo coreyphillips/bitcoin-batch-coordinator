@@ -33,7 +33,7 @@ if [ ! -f "data/coordinator.db" ]; then
 fi
 
 # Parse arguments or use defaults
-NETWORK="${NETWORK:-signet}"
+NETWORK="${NETWORK:-regtest}"
 MIN_PARTICIPANTS="${MIN_PARTICIPANTS:-2}"
 MAX_PARTICIPANTS="${MAX_PARTICIPANTS:-10}"
 DEADLINE_MS="${DEADLINE_MS:-300000}"

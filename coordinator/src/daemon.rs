@@ -28,7 +28,7 @@ struct Args {
     passphrase: Option<String>,
 
     /// Network: bitcoin, testnet, signet, or regtest
-    #[arg(long, default_value = "signet")]
+    #[arg(long, default_value = "regtest")]
     network: String,
 
     /// Fee rate in sat/vB
@@ -67,6 +67,19 @@ struct CoordinatorIdentity {
     pubkey: String,
 }
 
+#[derive(sqlx::FromRow)]
+struct CoordinatorConfigRow {
+    network: String,
+    fee_rate: i64,
+    min_participants: i64,
+    max_participants: i64,
+    deadline_ms: i64,
+    allow_change: bool,
+    multi_batch: bool,
+    broadcast_to_followers: bool,
+    encrypted_passphrase: Option<Vec<u8>>,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize tracing
@@ -96,6 +109,33 @@ async fn main() -> Result<()> {
 
     info!("✅ Database connected");
 
+    // Fetch coordinator config from database
+    info!("⚙️  Loading coordinator configuration...");
+    let config_row: Option<CoordinatorConfigRow> = sqlx::query_as(
+        "SELECT network, fee_rate, min_participants, max_participants, deadline_ms,
+                allow_change, multi_batch, broadcast_to_followers, encrypted_passphrase
+         FROM coordinator_config
+         WHERE id = 1"
+    )
+    .fetch_optional(&pool)
+    .await?;
+
+    let config_row = config_row.ok_or_else(|| {
+        anyhow::anyhow!("No coordinator configuration found. Database may be corrupted.")
+    })?;
+
+    // Use database config, but CLI args override
+    let network = args.network;
+    let fee_rate = args.fee_rate;
+    let min_participants = args.min_participants;
+    let max_participants = args.max_participants;
+    let deadline_ms = args.deadline_ms;
+    let allow_change = args.allow_change;
+    let multi_batch = args.multi_batch;
+    let broadcast_to_followers = args.broadcast_to_followers;
+
+    info!("✅ Configuration loaded (network: {}, fee: {} sat/vB)", network, fee_rate);
+
     // Fetch identity from database
     info!("🔑 Fetching coordinator identity...");
     let identity: Option<CoordinatorIdentity> = sqlx::query_as(
@@ -113,9 +153,16 @@ async fn main() -> Result<()> {
 
     info!("✅ Found {} identity: {}", identity.identity_type, identity.pubkey);
 
-    // Get passphrase
+    // Get passphrase - try database first, then CLI, then prompt
     let passphrase = if let Some(pass) = args.passphrase {
+        info!("Using passphrase from CLI argument");
         pass
+    } else if let Some(encrypted_pass) = config_row.encrypted_passphrase {
+        // Decrypt passphrase from database
+        info!("🔓 Decrypting stored passphrase...");
+        let decrypted_pass = decrypt_data(&encrypted_pass, "coordinator-internal-key")
+            .map_err(|e| anyhow::anyhow!("Failed to decrypt stored passphrase: {}", e))?;
+        String::from_utf8(decrypted_pass)?
     } else {
         // Prompt for passphrase
         print!("🔐 Enter passphrase to decrypt identity: ");
@@ -159,14 +206,14 @@ async fn main() -> Result<()> {
         recovery_method: recovery_method.to_string(),
         recovery_value,
         password: passphrase,
-        network: args.network,
-        fee_rate: args.fee_rate,
-        min_participants: args.min_participants,
-        max_participants: args.max_participants,
-        deadline_ms: args.deadline_ms,
-        allow_change: args.allow_change,
-        multi_batch: args.multi_batch,
-        broadcast_to_followers: args.broadcast_to_followers,
+        network,
+        fee_rate,
+        min_participants,
+        max_participants,
+        deadline_ms,
+        allow_change,
+        multi_batch,
+        broadcast_to_followers,
         electrum_host: None,
         electrum_port: None,
         electrum_proto: None,

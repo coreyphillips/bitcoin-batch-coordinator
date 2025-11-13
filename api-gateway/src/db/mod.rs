@@ -128,6 +128,38 @@ async fn run_migrations(pool: &SqlitePool) -> Result<()> {
     .execute(pool)
     .await?;
 
+    // Create coordinator config table
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS coordinator_config (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            network TEXT NOT NULL DEFAULT 'regtest',
+            fee_rate INTEGER NOT NULL DEFAULT 10,
+            min_participants INTEGER NOT NULL DEFAULT 2,
+            max_participants INTEGER NOT NULL DEFAULT 10,
+            deadline_ms INTEGER NOT NULL DEFAULT 300000,
+            allow_change BOOLEAN DEFAULT TRUE,
+            multi_batch BOOLEAN DEFAULT TRUE,
+            broadcast_to_followers BOOLEAN DEFAULT FALSE,
+            encrypted_passphrase BLOB,
+            updated_at INTEGER NOT NULL
+        )
+        "#,
+    )
+    .execute(pool)
+    .await?;
+
+    // Insert default config if not exists
+    sqlx::query(
+        r#"
+        INSERT OR IGNORE INTO coordinator_config (id, network, updated_at)
+        VALUES (1, 'regtest', ?)
+        "#,
+    )
+    .bind(chrono::Utc::now().timestamp())
+    .execute(pool)
+    .await?;
+
     // Create indices for better query performance
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_batches_state ON batches(state)")
         .execute(pool)
