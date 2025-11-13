@@ -1,4 +1,4 @@
-import { X, Save } from 'lucide-react';
+import { X, Save, Key } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 
 interface SettingsModalProps {
   onClose: () => void;
+  onOpenIdentity: () => void;
 }
 
 interface Config {
@@ -15,7 +16,7 @@ interface Config {
   timeout_seconds: string;
 }
 
-export function SettingsModal({ onClose }: SettingsModalProps) {
+export function SettingsModal({ onClose, onOpenIdentity }: SettingsModalProps) {
   const queryClient = useQueryClient();
 
   const { data: configData } = useQuery({
@@ -81,6 +82,29 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Identity Management */}
+          <div className="glass rounded-xl p-4 border border-white/10">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Key className="w-5 h-5 text-bitcoin-orange" />
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Coordinator Identity</h3>
+                  <p className="text-sm text-gray-400">Manage your Pubky identity</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenIdentity();
+                }}
+                className="px-4 py-2 bg-bitcoin-orange/20 hover:bg-bitcoin-orange/30 text-bitcoin-orange rounded-lg transition-colors font-semibold"
+              >
+                Manage Identity
+              </button>
+            </div>
+          </div>
+
           {/* Network Selection */}
           <div>
             <label className="block text-sm font-semibold text-white mb-2">

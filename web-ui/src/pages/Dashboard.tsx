@@ -4,6 +4,7 @@ import { BatchCard } from '../components/BatchCard';
 import { BatchDetailsModal } from '../components/BatchDetailsModal';
 import { CreateBatchModal } from '../components/CreateBatchModal';
 import { SettingsModal } from '../components/SettingsModal';
+import { IdentityModal } from '../components/IdentityModal';
 import { formatSatoshis } from '../lib/utils';
 import { Activity, TrendingUp, Users, Zap, Plus, Settings } from 'lucide-react';
 import { useState } from 'react';
@@ -13,6 +14,7 @@ export function Dashboard() {
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showIdentityModal, setShowIdentityModal] = useState(false);
 
   const { data: batchesData, isLoading: batchesLoading } = useQuery({
     queryKey: ['batches'],
@@ -257,7 +259,14 @@ export function Dashboard() {
       )}
 
       {showSettingsModal && (
-        <SettingsModal onClose={() => setShowSettingsModal(false)} />
+        <SettingsModal
+          onClose={() => setShowSettingsModal(false)}
+          onOpenIdentity={() => setShowIdentityModal(true)}
+        />
+      )}
+
+      {showIdentityModal && (
+        <IdentityModal onClose={() => setShowIdentityModal(false)} />
       )}
     </div>
   );
