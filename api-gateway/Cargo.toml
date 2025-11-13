@@ -24,7 +24,7 @@ tracing-subscriber = { workspace = true }
 clap = { version = "4.0", features = ["derive", "env"] }
 
 # Web framework
-axum = { version = "0.7", features = ["ws", "macros"] }
+axum = { version = "0.7", features = ["ws", "macros", "multipart"] }
 tower = "0.4"
 tower-http = { version = "0.5", features = ["cors", "fs", "trace", "compression-gzip"] }
 

@@ -8,6 +8,7 @@ use tracing::info;
 
 pub mod schema;
 pub mod queries;
+pub mod identity_queries;
 
 /// Initialize the database and run migrations
 pub async fn init_database(database_url: &str) -> Result<SqlitePool> {

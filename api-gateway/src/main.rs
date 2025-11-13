@@ -95,6 +95,11 @@ async fn main() -> Result<()> {
         .route("/config", post(routes::config::update_config))
         .route("/bans", get(routes::bans::list_bans))
         .route("/ws", get(routes::websocket::websocket_handler))
+        .route("/identity/current", get(routes::identity::get_current_identity))
+        .route("/identity/import-file", post(routes::identity::import_from_file))
+        .route("/identity/import-phrase", post(routes::identity::import_from_phrase))
+        .route("/identity/generate", post(routes::identity::generate_identity))
+        .route("/identity", axum::routing::delete(routes::identity::delete_identity))
         .with_state(app_state);
 
     // Build main app with middleware
