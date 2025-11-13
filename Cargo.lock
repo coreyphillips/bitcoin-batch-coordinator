@@ -717,7 +717,10 @@ dependencies = [
 name = "coordinator"
 version = "0.1.0"
 dependencies = [
+ "aes-gcm",
  "anyhow",
+ "argon2",
+ "base64 0.22.1",
  "bdk",
  "bitcoin",
  "blake3",
@@ -726,9 +729,11 @@ dependencies = [
  "common",
  "pkarr",
  "pubky-messenger",
+ "rand 0.8.5",
  "secp256k1 0.28.2",
  "serde",
  "serde_json",
+ "sqlx",
  "tempfile",
  "thiserror 1.0.69",
  "tokio",

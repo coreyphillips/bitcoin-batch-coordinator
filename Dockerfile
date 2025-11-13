@@ -18,7 +18,7 @@ COPY api-gateway ./api-gateway
 COPY electrum-servers.toml ./
 
 # Build release binaries
-RUN cargo build --release --bin api-gateway --bin coordinator
+RUN cargo build --release --bin api-gateway --bin coordinator --bin coordinator-daemon
 
 # Stage 2: Build Web UI
 FROM node:20-alpine AS ui-builder
@@ -53,6 +53,7 @@ RUN useradd -m -u 1000 -s /bin/bash appuser && \
 # Copy Rust binaries
 COPY --from=rust-builder /build/target/release/api-gateway /app/
 COPY --from=rust-builder /build/target/release/coordinator /app/
+COPY --from=rust-builder /build/target/release/coordinator-daemon /app/
 COPY --from=rust-builder /build/electrum-servers.toml /app/
 
 # Copy web UI
@@ -70,10 +71,11 @@ ENV API_HOST=0.0.0.0
 ENV API_PORT=3000
 ENV DATABASE_URL=sqlite:///data/coordinator.db
 ENV WEB_DIR=/app/web
-ENV NETWORK=bitcoin
+ENV NETWORK=signet
 ENV MIN_PARTICIPANTS=2
 ENV MAX_PARTICIPANTS=10
 ENV TIMEOUT_SECONDS=300
+# ENV COORDINATOR_PASSPHRASE=your-passphrase-here  # Set this to auto-start coordinator
 
 # Expose ports
 EXPOSE 3000
