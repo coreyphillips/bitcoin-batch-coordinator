@@ -1,5 +1,9 @@
 use anyhow::Result;
-use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
+use sqlx::{
+    sqlite::{SqliteConnectOptions, SqlitePoolOptions},
+    SqlitePool,
+};
+use std::str::FromStr;
 use tracing::info;
 
 pub mod schema;
@@ -7,10 +11,14 @@ pub mod queries;
 
 /// Initialize the database and run migrations
 pub async fn init_database(database_url: &str) -> Result<SqlitePool> {
+    // Configure SQLite to create database if missing
+    let options = SqliteConnectOptions::from_str(database_url)?
+        .create_if_missing(true);
+
     // Create connection pool
     let pool = SqlitePoolOptions::new()
         .max_connections(5)
-        .connect(database_url)
+        .connect_with(options)
         .await?;
 
     // Run migrations
