@@ -52,37 +52,54 @@ echo -e "${YELLOW}========================================${NC}"
 echo -e "${GREEN}✅ Build Complete!${NC}"
 echo -e "${YELLOW}========================================${NC}"
 echo ""
-echo "To start the system:"
+echo "Quick Start:"
 echo ""
-echo -e "${BLUE}Terminal 1: Start API Gateway + Dashboard${NC}"
-echo "  ./target/release/api-gateway \\"
-echo "    --host 0.0.0.0 \\"
-echo "    --port 3000 \\"
-echo "    --database-url sqlite:///$PROJECT_DIR/data/coordinator.db \\"
-echo "    --web-dir $PROJECT_DIR/web-ui/dist"
+echo -e "${BLUE}Just run this script - it will start both services!${NC}"
 echo ""
-echo -e "${BLUE}Terminal 2: Start Coordinator Daemon (after importing identity)${NC}"
-echo "  ./target/release/coordinator-daemon \\"
-echo "    --database-url sqlite:///$PROJECT_DIR/data/coordinator.db \\"
-echo "    --network signet"
+echo "  ./start-local.sh"
 echo ""
-echo -e "${YELLOW}Next steps:${NC}"
-echo "1. Start the API Gateway (Terminal 1 command above)"
-echo "2. Open http://localhost:3000 in your browser"
-echo "3. Import your identity (file or recovery phrase)"
-echo "4. Start the Coordinator Daemon (Terminal 2 command above)"
+echo -e "${YELLOW}What happens:${NC}"
+echo "1. Coordinator daemon starts in background (auto-reads passphrase)"
+echo "2. API Gateway + Dashboard start in foreground"
+echo "3. Open http://localhost:3000 and import your identity"
+echo "4. Both services work together automatically!"
+echo "5. Press Ctrl+C to stop both"
 echo ""
 echo -e "${GREEN}See TESTING.md for detailed instructions!${NC}"
 echo ""
 
-# Offer to start API gateway
-read -p "Start API Gateway now? (y/n) " -n 1 -r
+# Offer to start both services
+read -p "Start both API Gateway + Coordinator now? (y/n) " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo ""
-    echo -e "${GREEN}Starting API Gateway...${NC}"
+    echo -e "${GREEN}🎯 Starting Coordinator Daemon in background...${NC}"
+
+    # Start coordinator daemon in background
+    ./target/release/coordinator-daemon \
+        --database-url "sqlite:///$PROJECT_DIR/data/coordinator.db" \
+        --network regtest \
+        > "$PROJECT_DIR/data/coordinator.log" 2>&1 &
+
+    COORDINATOR_PID=$!
+    echo -e "${GREEN}✅ Coordinator started (PID: $COORDINATOR_PID)${NC}"
+    echo -e "${YELLOW}   Logs: $PROJECT_DIR/data/coordinator.log${NC}"
+    echo -e "${YELLOW}   Note: Coordinator will auto-read passphrase after you import identity${NC}"
+    echo ""
+
+    # Give it a moment to start
+    sleep 1
+
+    echo -e "${GREEN}🌐 Starting API Gateway...${NC}"
     echo -e "${YELLOW}Dashboard will be available at: http://localhost:3000${NC}"
     echo ""
+    echo -e "${YELLOW}Press Ctrl+C to stop both services${NC}"
+    echo ""
+
+    # Trap to kill coordinator on exit
+    trap "echo ''; echo 'Stopping coordinator...'; kill $COORDINATOR_PID 2>/dev/null; exit" INT TERM EXIT
+
+    # Start API gateway in foreground
     ./target/release/api-gateway \
         --host 0.0.0.0 \
         --port 3000 \
