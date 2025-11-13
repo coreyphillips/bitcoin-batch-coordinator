@@ -100,6 +100,10 @@ async fn main() -> Result<()> {
     // Build main app with middleware
     let app = Router::new()
         .nest("/api/v1", api_routes)
+        .fallback_service(
+            tower_http::services::ServeDir::new(&args.web_dir)
+                .fallback(tower_http::services::ServeFile::new(format!("{}/index.html", args.web_dir)))
+        )
         .layer(
             tower_http::cors::CorsLayer::permissive()
                 .allow_origin(tower_http::cors::Any)
@@ -111,6 +115,7 @@ async fn main() -> Result<()> {
     let addr = format!("{}:{}", args.host, args.port);
     info!("🌐 API Gateway listening on http://{}", addr);
     info!("📡 WebSocket endpoint: ws://{}/api/v1/ws", addr);
+    info!("🎨 Dashboard: http://{}", addr);
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     axum::serve(listener, app).await?;
