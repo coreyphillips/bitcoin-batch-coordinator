@@ -17,6 +17,9 @@ target
 logs/
 *.log
 
+# Runtime data (database files)
+data/
+
 # Test configuration (unused)
 test-config.json
 

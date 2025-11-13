@@ -165,6 +165,7 @@ pub async fn create_batch(
                     message: "Coordinator is already running and accepting participants".to_string(),
                 }))
             } else {
+                tracing::error!("Failed to start coordinator: {}", e);
                 Err(StatusCode::INTERNAL_SERVER_ERROR)
             }
         }
