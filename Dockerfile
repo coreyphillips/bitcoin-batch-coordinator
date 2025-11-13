@@ -45,6 +45,11 @@ RUN apt-get update && apt-get install -y \
     sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
+# Create app user and directories
+RUN useradd -m -u 1000 -s /bin/bash appuser && \
+    mkdir -p /app /data /config && \
+    chown -R appuser:appuser /app /data /config
+
 # Copy Rust binaries
 COPY --from=rust-builder /build/target/release/api-gateway /app/
 COPY --from=rust-builder /build/target/release/coordinator /app/
@@ -53,8 +58,12 @@ COPY --from=rust-builder /build/electrum-servers.toml /app/
 # Copy web UI
 COPY --from=ui-builder /app/dist /app/web
 
-# Create data directories with proper permissions
-RUN mkdir -p /data /config && chmod 777 /data /config
+# Copy entrypoint script
+COPY docker/entrypoint.sh /app/
+RUN chmod +x /app/entrypoint.sh
+
+# Set ownership
+RUN chown -R appuser:appuser /app /data /config
 
 # Environment defaults
 ENV API_HOST=0.0.0.0
@@ -69,8 +78,7 @@ ENV TIMEOUT_SECONDS=300
 # Expose ports
 EXPOSE 3000
 
-# Copy entrypoint script
-COPY docker/entrypoint.sh /app/
-RUN chmod +x /app/entrypoint.sh
+# Switch to non-root user
+USER appuser
 
 ENTRYPOINT ["/app/entrypoint.sh"]
