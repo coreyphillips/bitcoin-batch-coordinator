@@ -53,8 +53,8 @@ COPY --from=rust-builder /build/electrum-servers.toml /app/
 # Copy web UI
 COPY --from=ui-builder /app/dist /app/web
 
-# Create data directories
-RUN mkdir -p /data /config
+# Create data directories with proper permissions
+RUN mkdir -p /data /config && chmod 777 /data /config
 
 # Environment defaults
 ENV API_HOST=0.0.0.0
