@@ -451,6 +451,7 @@ dependencies = [
  "bdk",
  "bitcoin",
  "blake3",
+ "futures",
  "hex",
  "pkarr",
  "pubky-messenger",

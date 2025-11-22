@@ -507,6 +507,21 @@ async fn process_batch(
             reveals.len(),
             batch.intent.min_participants
         );
+
+        // Clean up messages with participants who did commit
+        info!("Cleaning up messages after failed batch {} (insufficient reveals)...", intent_id);
+        {
+            let transport_lock = transport.lock().await;
+            for participant in batch.commitments.keys() {
+                if let Err(e) = transport_lock.clear_messages_with_peer(participant).await {
+                    debug!(
+                        "Failed to clear messages with participant {}: {}",
+                        participant, e
+                    );
+                }
+            }
+        }
+
         batch_manager
             .update_batch_status(intent_id, BatchStatus::Completed)
             .await?;
@@ -665,6 +680,21 @@ async fn process_batch(
 
     if fragments.is_empty() {
         error!("No signatures received for batch {}", intent_id);
+
+        // Clean up messages with participants who revealed
+        info!("Cleaning up messages after failed batch {} (no signatures)...", intent_id);
+        {
+            let transport_lock = transport.lock().await;
+            for participant in reveals.keys() {
+                if let Err(e) = transport_lock.clear_messages_with_peer(participant).await {
+                    debug!(
+                        "Failed to clear messages with participant {}: {}",
+                        participant, e
+                    );
+                }
+            }
+        }
+
         batch_manager
             .update_batch_status(intent_id, BatchStatus::Completed)
             .await?;
@@ -739,6 +769,22 @@ async fn process_batch(
                     .await;
             }
 
+            // Clean up messages with all participants after successful batch
+            info!("Cleaning up messages after successful batch {}...", intent_id);
+            {
+                let transport_lock = transport.lock().await;
+                for participant in reveals.keys() {
+                    if let Err(e) = transport_lock.clear_messages_with_peer(participant).await {
+                        debug!(
+                            "Failed to clear messages with participant {}: {}",
+                            participant, e
+                        );
+                        // Continue - cleanup errors are non-fatal
+                    }
+                }
+            }
+            info!("Message cleanup complete for batch {}", intent_id);
+
             // Mark batch as completed
             batch_manager
                 .update_batch_status(intent_id, BatchStatus::Completed)
@@ -752,6 +798,20 @@ async fn process_batch(
             );
             let raw_tx_hex = serialize_hex(&final_tx);
             info!("Raw TX (for manual broadcast): {}", raw_tx_hex);
+
+            // Clean up messages even on broadcast failure (transaction was still created)
+            info!("Cleaning up messages after batch {} (broadcast failed)...", intent_id);
+            {
+                let transport_lock = transport.lock().await;
+                for participant in reveals.keys() {
+                    if let Err(e) = transport_lock.clear_messages_with_peer(participant).await {
+                        debug!(
+                            "Failed to clear messages with participant {}: {}",
+                            participant, e
+                        );
+                    }
+                }
+            }
 
             // Still mark as completed to avoid reprocessing
             batch_manager

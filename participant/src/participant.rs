@@ -22,6 +22,9 @@ use uuid::Uuid;
 const MESSAGE_CLEAR_DELAY_MS: u64 = 100; // Delay after clearing messages before proceeding
 const CURRENT_INTENT_INITIAL_WAIT_MS: u64 = 200; // Initial wait before requesting current intent
 const CURRENT_INTENT_POLL_INTERVAL_MS: u64 = 200; // How often to poll for current intent response
+const CURRENT_INTENT_TIMEOUT_SECS: u64 = 60; // Timeout for current intent response (DHT can be slow)
+const CURRENT_INTENT_MAX_RETRIES: u32 = 3; // Maximum retry attempts for getting current intent
+const CURRENT_INTENT_INITIAL_BACKOFF_MS: u64 = 1000; // Initial backoff delay between retries
 const REQUEST_REVEAL_POLL_INTERVAL_MS: u64 = 100; // How often to check for reveal request
 const TEMPLATE_POLL_INTERVAL_MS: u64 = 500; // How often to check for template
 const FINAL_TX_POLL_INTERVAL_MS: u64 = 500; // How often to check for final transaction
@@ -101,23 +104,10 @@ pub async fn run(
             intent_id
         );
 
-        // Clear any old messages
-        info!("Clearing received message queue before querying...");
-        let _ = transport.receive_from(coordinator_pkarr).await;
-        sleep(Duration::from_millis(MESSAGE_CLEAR_DELAY_MS)).await;
-
-        // Query coordinator for the specific intent details
-        let get_intent = GetCurrentIntent {
-            participant_pkarr: participant_pubkey.clone(),
-        };
-
-        let request_time = std::time::Instant::now();
-        transport
-            .send_dm(coordinator_pkarr, &WireMsg::GetCurrentIntent(get_intent))
-            .await?;
-
-        // Wait for the CurrentIntent response
-        match wait_for_current_intent_after(&transport, coordinator_pkarr, request_time).await {
+        // Query coordinator with retry logic
+        match query_current_intent_with_retry(&transport, coordinator_pkarr, &participant_pubkey)
+            .await
+        {
             Ok(current_intent) => {
                 // Verify the intent ID matches what we expected
                 if current_intent.intent.intent_id != intent_id {
@@ -143,31 +133,13 @@ pub async fn run(
             }
         }
     } else {
-        // Clear any messages we might have already received from coordinator
-        // This ensures we start fresh and don't get stale CurrentIntent messages
-        info!("Clearing received message queue before querying...");
-        let _ = transport.receive_from(coordinator_pkarr).await;
-
-        // Short delay to ensure message queue is cleared
-        sleep(Duration::from_millis(MESSAGE_CLEAR_DELAY_MS)).await;
-
         // Try to query coordinator for current intent (multi-batch mode)
         info!("Querying coordinator for current batch intent...");
 
-        // Send request for current intent
-        let get_intent = GetCurrentIntent {
-            participant_pkarr: participant_pubkey.clone(),
-        };
-
-        // Record the time we sent the request
-        let request_time = std::time::Instant::now();
-        transport
-            .send_dm(coordinator_pkarr, &WireMsg::GetCurrentIntent(get_intent))
-            .await?;
-
-        // Try to wait for CurrentIntent response, but fall back to waiting for Intent broadcast
-        // Pass the request time so we only accept messages that arrive after our request
-        match wait_for_current_intent_after(&transport, coordinator_pkarr, request_time).await {
+        // Query with retry logic
+        match query_current_intent_with_retry(&transport, coordinator_pkarr, &participant_pubkey)
+            .await
+        {
             Ok(current_intent) => {
                 info!(
                     "Received current intent: {} (status: {:?}, participants: {}/{})",
@@ -606,7 +578,9 @@ async fn wait_for_current_intent_after(
     coordinator: &str,
     request_time: std::time::Instant,
 ) -> Result<CurrentIntent> {
-    let result = timeout(Duration::from_secs(10), async {
+    // Use longer timeout because coordinator may need to poll multiple peers over DHT
+    // which can take significant time (10-15+ seconds per peer in some network conditions)
+    let result = timeout(Duration::from_secs(CURRENT_INTENT_TIMEOUT_SECS), async {
         // Short initial delay to give coordinator time to process and respond
         sleep(Duration::from_millis(CURRENT_INTENT_INITIAL_WAIT_MS)).await;
 
@@ -636,6 +610,76 @@ async fn wait_for_current_intent_after(
         Ok(Err(e)) => Err(e),
         Err(_) => Err(BatchError::Timeout("current_intent".to_string())),
     }
+}
+
+/// Query coordinator for current intent with retry logic and exponential backoff
+async fn query_current_intent_with_retry(
+    transport: &Transport,
+    coordinator_pkarr: &str,
+    participant_pubkey: &str,
+) -> Result<CurrentIntent> {
+    let mut backoff_ms = CURRENT_INTENT_INITIAL_BACKOFF_MS;
+    let mut last_error = None;
+
+    for attempt in 1..=CURRENT_INTENT_MAX_RETRIES {
+        info!(
+            "Querying coordinator for current intent (attempt {}/{})",
+            attempt, CURRENT_INTENT_MAX_RETRIES
+        );
+
+        // Clear any old messages before each attempt
+        let _ = transport.receive_from(coordinator_pkarr).await;
+        sleep(Duration::from_millis(MESSAGE_CLEAR_DELAY_MS)).await;
+
+        // Send request for current intent
+        let get_intent = GetCurrentIntent {
+            participant_pkarr: participant_pubkey.to_string(),
+        };
+
+        let request_time = std::time::Instant::now();
+        if let Err(e) = transport
+            .send_dm(coordinator_pkarr, &WireMsg::GetCurrentIntent(get_intent))
+            .await
+        {
+            warn!("Failed to send GetCurrentIntent request: {}", e);
+            last_error = Some(e);
+
+            if attempt < CURRENT_INTENT_MAX_RETRIES {
+                info!("Retrying in {}ms...", backoff_ms);
+                sleep(Duration::from_millis(backoff_ms)).await;
+                backoff_ms *= 2; // Exponential backoff
+            }
+            continue;
+        }
+
+        // Wait for the CurrentIntent response
+        match wait_for_current_intent_after(transport, coordinator_pkarr, request_time).await {
+            Ok(current_intent) => {
+                return Ok(current_intent);
+            }
+            Err(e) => {
+                warn!(
+                    "Attempt {}/{} failed to get current intent: {}",
+                    attempt, CURRENT_INTENT_MAX_RETRIES, e
+                );
+                last_error = Some(e);
+
+                if attempt < CURRENT_INTENT_MAX_RETRIES {
+                    info!("Retrying in {}ms with exponential backoff...", backoff_ms);
+                    sleep(Duration::from_millis(backoff_ms)).await;
+                    backoff_ms *= 2; // Exponential backoff
+                }
+            }
+        }
+    }
+
+    // All retries exhausted
+    Err(last_error.unwrap_or_else(|| {
+        BatchError::Timeout(format!(
+            "Failed to get current intent after {} attempts",
+            CURRENT_INTENT_MAX_RETRIES
+        ))
+    }))
 }
 
 async fn wait_for_template(

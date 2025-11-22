@@ -299,11 +299,14 @@ impl Transport {
 
     /// Receive messages from all known peers (for coordinator)
     ///
-    /// This polls all known peers and returns messages. Peers are automatically
+    /// This polls all known peers **concurrently** and returns messages. Peers are automatically
     /// tracked when they send messages. For the initial discovery phase, the
     /// coordinator needs to know participant public keys (e.g., from a bulletin board).
+    ///
+    /// Concurrent polling significantly improves performance when polling multiple peers
+    /// over DHT, as each DHT lookup can take 10-15+ seconds.
     pub async fn receive_all(&self) -> Result<Vec<(String, WireMsg)>> {
-        let mut all_parsed = Vec::new();
+        use futures::future::join_all;
 
         // Get snapshot of known peers
         let peers: Vec<String> = {
@@ -314,9 +317,30 @@ impl Transport {
             }
         };
 
-        // Poll each known peer
-        for peer_pkarr in peers {
-            match self.receive_from(&peer_pkarr).await {
+        if peers.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        debug!("Polling {} peers concurrently for messages", peers.len());
+
+        // Poll all peers concurrently
+        let futures: Vec<_> = peers
+            .iter()
+            .map(|peer_pkarr| {
+                let peer = peer_pkarr.clone();
+                async move {
+                    let result = self.receive_from(&peer).await;
+                    (peer, result)
+                }
+            })
+            .collect();
+
+        let results = join_all(futures).await;
+
+        // Collect all successful results
+        let mut all_parsed = Vec::new();
+        for (peer_pkarr, result) in results {
+            match result {
                 Ok(messages) => {
                     for msg in messages {
                         all_parsed.push((peer_pkarr.clone(), msg));
@@ -327,6 +351,12 @@ impl Transport {
                 }
             }
         }
+
+        debug!(
+            "Concurrent polling complete: received {} messages from {} peers",
+            all_parsed.len(),
+            peers.len()
+        );
 
         Ok(all_parsed)
     }
